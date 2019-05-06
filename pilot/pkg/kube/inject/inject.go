@@ -505,6 +505,26 @@ func isset(m map[string]string, key string) bool {
 	return ok
 }
 
+func defaultAsFalse(m map[string]string, key string) bool {
+	if val, ok := m[key]; ok {
+		switch strings.ToLower(val) {
+		case "true", "t":
+			return true
+		}
+	}
+	return false
+}
+
+func defaultAsTrue(m map[string]string, key string) bool {
+	if val, ok := m[key]; ok {
+		switch strings.ToLower(val) {
+		case "f", "false":
+			return false
+		}
+	}
+	return true
+}
+
 func directory(filepath string) string {
 	dir, _ := path.Split(filepath)
 	return dir
@@ -553,6 +573,8 @@ func InjectionData(sidecarTemplate, valuesConfig, version string, deploymentMeta
 		"indent":              indent,
 		"directory":           directory,
 		"contains":            flippedContains,
+		"defaultAsFalse":      defaultAsFalse,
+		"defaultAsTrue":       defaultAsTrue,
 	}
 
 	var tmpl bytes.Buffer
