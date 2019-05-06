@@ -194,7 +194,7 @@ endif
 GEN_CERT := ${ISTIO_BIN}/generate_cert
 
 # Set Google Storage bucket if not set
-GS_BUCKET ?= istio-artifacts
+GS_BUCKET ?= artifacts.lambdai-experiment.appspot.com
 
 .PHONY: default
 default: depend build test

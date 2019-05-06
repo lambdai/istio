@@ -394,6 +394,9 @@ const (
 
 	// IstioIngressNamespace is the namespace where Istio ingress controller is deployed
 	IstioIngressNamespace = "istio-system"
+
+	// IstioInboundInterceptionSplit is the key indicating whether proxy wants inbound/outbound listener split
+	IstioInboundInterceptionSplit = "INBOUND_INTERCEPTION_SPLIT"
 )
 
 // IstioIngressWorkloadLabels is the label assigned to Istio ingress pods
@@ -658,4 +661,13 @@ func (node *Proxy) GetInterceptionMode() TrafficInterceptionMode {
 	}
 
 	return InterceptionRedirect
+}
+
+// Inbound interception split mode only supports iptables REDIRECT
+func (node *Proxy) IsInboundOutboundListenerSplitEnabled() bool {
+	if node.GetInterceptionMode() != InterceptionRedirect {
+		return false
+	}
+	_, ok := node.Metadata[IstioInboundInterceptionSplit]
+	return ok
 }
