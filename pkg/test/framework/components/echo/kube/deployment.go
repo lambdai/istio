@@ -79,11 +79,16 @@ spec:
 {{- if ne .Locality "" }}
         istio-locality: {{ .Locality }}
 {{- end }}
-{{- if .WorkloadAnnotations }}
       annotations:
+{{- if .WorkloadAnnotations }}
 {{- range $name, $value := .WorkloadAnnotations }}
        {{ $name }}: {{ printf "%q" $value }}
 {{- end }}
+{{- if not .Sidecar }}
+        sidecar.istio.io/inject: "false"
+{{- end }}
+{{- if .InboundInterceptionSplit }}
+        sidecar.istio.io/inboundInterceptionSplit: "true"
 {{- end }}
     spec:
 {{- if .ServiceAccount }}
@@ -180,18 +185,19 @@ func generateYAML(cfg echo.Config) (string, error) {
 	}
 
 	params := map[string]interface{}{
-		"Hub":                 settings.Hub,
-		"Tag":                 settings.Tag,
-		"PullPolicy":          settings.PullPolicy,
-		"Service":             cfg.Service,
-		"Version":             cfg.Version,
-		"Headless":            cfg.Headless,
-		"Locality":            cfg.Locality,
-		"ServiceAccount":      cfg.ServiceAccount,
-		"Ports":               cfg.Ports,
-		"ContainerPorts":      getContainerPorts(cfg.Ports),
-		"ServiceAnnotations":  serviceAnnotations,
-		"WorkloadAnnotations": workloadAnnotations,
+		"Hub":                      settings.Hub,
+		"Tag":                      settings.Tag,
+		"PullPolicy":               settings.PullPolicy,
+		"Service":                  cfg.Service,
+		"Version":                  cfg.Version,
+		"Headless":                 cfg.Headless,
+		"Locality":                 cfg.Locality,
+		"ServiceAccount":           cfg.ServiceAccount,
+		"Ports":                    cfg.Ports,
+		"ContainerPorts":           getContainerPorts(cfg.Ports),
+		"ServiceAnnotations":       serviceAnnotations,
+		"WorkloadAnnotations":      workloadAnnotations,
+		"InboundInterceptionSplit": cfg.InboundInterceptionSplit,
 	}
 
 	// Generate the YAML content.

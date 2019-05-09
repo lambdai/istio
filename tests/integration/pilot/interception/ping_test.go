@@ -64,11 +64,12 @@ type appConnectionPair struct {
 	src, dst echo.Instance
 }
 
-func TestReachablity(t *testing.T) {
+func TestReachability(t *testing.T) {
 	framework.NewTest(t).Run(func(ctx framework.TestContext) {
 		doTest(t, ctx)
 	})
 }
+
 func doTest(t *testing.T, ctx framework.TestContext) {
 
 	//istioCfg := istio.DefaultConfigOrFail(t, ctx)
@@ -87,39 +88,43 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 	}
 
 	inoutUnitedApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:   "inoutunitedapp0",
-		Namespace: ns,
-		Sidecar:   true,
-		Ports:     ports,
-		Galley:    g,
-		Pilot:     p,
+		Service:                  "inoutunitedapp0",
+		Namespace:                ns,
+		Sidecar:                  true,
+		Ports:                    ports,
+		Galley:                   g,
+		Pilot:                    p,
+		InboundInterceptionSplit: false,
 	})
 
 	inoutUnitedApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:   "inoutunitedapp1",
-		Namespace: ns,
-		Sidecar:   true,
-		Ports:     ports,
-		Galley:    g,
-		Pilot:     p,
+		Service:                  "inoutunitedapp1",
+		Namespace:                ns,
+		Sidecar:                  true,
+		Ports:                    ports,
+		Galley:                   g,
+		Pilot:                    p,
+		InboundInterceptionSplit: false,
 	})
 
 	inoutSplitApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:   "inoutsplitapp0",
-		Namespace: ns,
-		Sidecar:   true,
-		Ports:     ports,
-		Galley:    g,
-		Pilot:     p,
+		Service:                  "inoutsplitapp0",
+		Namespace:                ns,
+		Sidecar:                  true,
+		Ports:                    ports,
+		Galley:                   g,
+		Pilot:                    p,
+		InboundInterceptionSplit: true,
 	})
 
 	inoutSplitApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:   "inoutsplitapp1",
-		Namespace: ns,
-		Sidecar:   true,
-		Ports:     ports,
-		Galley:    g,
-		Pilot:     p,
+		Service:                  "inoutsplitapp1",
+		Namespace:                ns,
+		Sidecar:                  true,
+		Ports:                    ports,
+		Galley:                   g,
+		Pilot:                    p,
+		InboundInterceptionSplit: true,
 	})
 
 	inoutUnitedApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
