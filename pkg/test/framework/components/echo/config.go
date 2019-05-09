@@ -59,6 +59,9 @@ type Config struct {
 	// Ports for this application. Port numbers may or may not be used, depending
 	// on the implementation.
 	Ports []Port
+
+	// true if the inbound and outbound capture port are separated
+	InboundInterceptionSplit bool
 }
 
 // String implements the Configuration interface (which implements fmt.Stringer)

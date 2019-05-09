@@ -73,9 +73,12 @@ spec:
 {{- if ne .Locality "" }}
         istio-locality: {{ .Locality }}
 {{- end }}
-{{- if not .Sidecar }}
       annotations:
+{{- if not .Sidecar }}
         sidecar.istio.io/inject: "false"
+{{- end }}
+{{- if .InboundInterceptionSplit }}
+        sidecar.istio.io/inboundInterceptionSplit: "true"
 {{- end }}
     spec:
 {{- if .ServiceAccount }}
@@ -158,17 +161,18 @@ func generateYAML(cfg echo.Config) (string, error) {
 	}
 
 	params := map[string]interface{}{
-		"Hub":            settings.Hub,
-		"Tag":            settings.Tag,
-		"PullPolicy":     settings.PullPolicy,
-		"Service":        cfg.Service,
-		"Version":        cfg.Version,
-		"Sidecar":        cfg.Sidecar,
-		"Headless":       cfg.Headless,
-		"Locality":       cfg.Locality,
-		"ServiceAccount": cfg.ServiceAccount,
-		"Ports":          cfg.Ports,
-		"ContainerPorts": getContainerPorts(cfg.Ports),
+		"Hub":                      settings.Hub,
+		"Tag":                      settings.Tag,
+		"PullPolicy":               settings.PullPolicy,
+		"Service":                  cfg.Service,
+		"Version":                  cfg.Version,
+		"Sidecar":                  cfg.Sidecar,
+		"Headless":                 cfg.Headless,
+		"Locality":                 cfg.Locality,
+		"ServiceAccount":           cfg.ServiceAccount,
+		"Ports":                    cfg.Ports,
+		"ContainerPorts":           getContainerPorts(cfg.Ports),
+		"InboundInterceptionSplit": cfg.InboundInterceptionSplit,
 	}
 
 	// Generate the YAML content.
