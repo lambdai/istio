@@ -182,7 +182,7 @@ containers:
         fieldPath: metadata.namespace
   - name: ISTIO_META_INTERCEPTION_MODE
     value: "{{ or (index .ObjectMeta.Annotations `sidecar.istio.io/interceptionMode`) .ProxyConfig.InterceptionMode.String }}"
-{{ if (defaultAsFalse .ObjectMeta.Annotation `sidecar.istio.io/inboundInterceptionSplit`) }}
+{{ if (defaultAsFalse .ObjectMeta.Annotations `sidecar.istio.io/inboundInterceptionSplit`) }}
   - name: ISTIO_META_INBOUND_INTERCEPTION_SPLIT
     value: true
 {{ end }}

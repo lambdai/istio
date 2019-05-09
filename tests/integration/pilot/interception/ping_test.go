@@ -16,10 +16,16 @@ package interception
 
 import (
 	"fmt"
-	"istio.io/istio/pkg/test/framework/components/apps"
+	"istio.io/istio/pilot/pkg/model"
+	"istio.io/istio/pkg/test/echo/common/scheme"
+	"istio.io/istio/pkg/test/framework/components/echo"
+	"istio.io/istio/pkg/test/framework/components/echo/echoboot"
 	"istio.io/istio/pkg/test/framework/components/galley"
+	"istio.io/istio/pkg/test/framework/components/namespace"
 	"istio.io/istio/pkg/test/framework/components/pilot"
+	"istio.io/istio/pkg/test/framework/resource"
 	"istio.io/istio/pkg/test/util/retry"
+	"istio.io/istio/tests/integration/security/util/connection"
 	"testing"
 	"time"
 
@@ -28,30 +34,95 @@ import (
 	"istio.io/istio/pkg/test/framework/components/istio"
 )
 
+var (
+	ist istio.Instance
+	g   galley.Instance
+	p   pilot.Instance
+)
+
 func TestMain(m *testing.M) {
-	var ist istio.Instance
-	framework.NewSuite("ping_at_traffic_interception", m).
+	framework.
+		NewSuite("inbound_split_test", m).
+		RequireEnvironment(environment.Kube).
 		SetupOnEnv(environment.Kube, istio.Setup(&ist, nil)).
+		Setup(func(ctx resource.Context) (err error) {
+			if g, err = galley.New(ctx, galley.Config{}); err != nil {
+				return err
+			}
+			if p, err = pilot.New(ctx, pilot.Config{
+				Galley: g,
+			}); err != nil {
+				return err
+			}
+			return nil
+		}).
 		Run()
+
 }
 
 type appConnectionPair struct {
-	src, dst apps.KubeApp
+	src, dst echo.Instance
 }
 
 func TestReachablity(t *testing.T) {
-	// WTF
-	ctx := framework.NewContext(t)
-	defer ctx.Done(t)
-	g := galley.NewOrFail(t, ctx, galley.Config{})
-	p := pilot.NewOrFail(t, ctx, pilot.Config{Galley: g})
-	appsInstance := apps.NewOrFail(t, ctx, apps.Config{Pilot: p, Galley: g})
+	framework.NewTest(t).Run(func(ctx framework.TestContext) {
+		doTest(t, ctx)
+	})
+}
+func doTest(t *testing.T, ctx framework.TestContext) {
 
-	inoutUnitedApp0, _ := appsInstance.GetAppOrFail("a", t).(apps.KubeApp)
-	inoutUnitedApp1, _ := appsInstance.GetAppOrFail("b", t).(apps.KubeApp)
+	//istioCfg := istio.DefaultConfigOrFail(t, ctx)
+	//systemNS := namespace.ClaimOrFail(t, ctx, istioCfg.SystemNamespace)
+	ns := namespace.NewOrFail(t, ctx, "inboundsplit", true)
 
-	inoutSplitApp0, _ := appsInstance.GetAppOrFail("c", t).(apps.KubeApp)
-	inoutSplitApp1, _ := appsInstance.GetAppOrFail("d", t).(apps.KubeApp)
+	ports := []echo.Port{
+		{
+			Name:     "http",
+			Protocol: model.ProtocolHTTP,
+		},
+		{
+			Name:     "tcp",
+			Protocol: model.ProtocolTCP,
+		},
+	}
+
+	inoutUnitedApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
+		Service:   "inoutunitedapp0",
+		Namespace: ns,
+		Sidecar:   true,
+		Ports:     ports,
+		Galley:    g,
+		Pilot:     p,
+	})
+
+	inoutUnitedApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
+		Service:   "inoutunitedapp1",
+		Namespace: ns,
+		Sidecar:   true,
+		Ports:     ports,
+		Galley:    g,
+		Pilot:     p,
+	})
+
+	inoutSplitApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
+		Service:   "inoutsplitapp0",
+		Namespace: ns,
+		Sidecar:   true,
+		Ports:     ports,
+		Galley:    g,
+		Pilot:     p,
+	})
+
+	inoutSplitApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
+		Service:   "inoutsplitapp1",
+		Namespace: ns,
+		Sidecar:   true,
+		Ports:     ports,
+		Galley:    g,
+		Pilot:     p,
+	})
+
+	inoutUnitedApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
 
 	connectivityPairs := []appConnectionPair{
 		// source is inout united
@@ -66,29 +137,27 @@ func TestReachablity(t *testing.T) {
 		{inoutUnitedApp0, inoutUnitedApp0},
 		{inoutSplitApp0, inoutSplitApp0},
 	}
+
 	for _, pair := range connectivityPairs {
-		src := pair.src
-		dst := pair.dst
-		retry.UntilSuccessOrFail(t, func() error {
-			ep := dst.EndpointForPort(80)
-			if ep == nil {
-				return fmt.Errorf("cannot get upstream endpoint for connection test %s", dst.Name())
-			}
-
-			results, err := src.Call(ep, apps.AppCallOptions{Protocol: apps.AppProtocolHTTP, Path: ""})
-
-			if err != nil || len(results) == 0 || results[0].Code != "200" {
-				// Addition log for debugging purpose.
-				if err != nil {
-					t.Logf("Error: %#v\n", err)
-				} else if len(results) == 0 {
-					t.Logf("No result\n")
-				} else {
-					t.Logf("Result: %v\n", results[0])
-				}
-				return fmt.Errorf("%s cannot connect to %s on port 80 using protocol HTTP", src.Name(), dst.Name())
-			}
-			return nil
-		}, retry.Delay(time.Second), retry.Timeout(10*time.Second))
+		connChecker := connection.Checker{
+			From: pair.src,
+			Options: echo.CallOptions{
+				Target:   pair.dst,
+				PortName: string(scheme.HTTP),
+				Scheme:   scheme.HTTP,
+			},
+			ExpectSuccess: true,
+		}
+		subTestName := fmt.Sprintf(
+			"%s->%s:%s",
+			pair.src.Config().Service,
+			pair.dst.Config().Service,
+			connChecker.Options.PortName)
+		t.Run(subTestName,
+			func(t *testing.T) {
+				retry.UntilSuccessOrFail(t, connChecker.Check,
+					retry.Delay(time.Second),
+					retry.Timeout(10*time.Second))
+			})
 	}
 }
