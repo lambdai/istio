@@ -188,83 +188,6 @@ func (configgen *ConfigGeneratorImpl) BuildListeners(env *model.Environment, nod
 	return nil, nil
 }
 
-func (configgen *ConfigGeneratorImpl) mergeInOutBoundListeners(
-	// common context
-	env *model.Environment, node *model.Proxy,
-	push *model.PushContext,
-
-	// generated inbound and outbound listeners in the previous phase
-	inbound []*xdsapi.Listener,
-	outbound []*xdsapi.Listener,
-
-	// options
-	shouldSplitInOutBound bool,
-	// TODO(silentdai): support below flags
-	shouldMigrateInbound bool,
-	shouldMigrateOutbound bool) []*xdsapi.Listener {
-	listeners := make([]*xdsapi.Listener, 0)
-
-	listeners = append(listeners, inbound...)
-	listeners = append(listeners, outbound...)
-
-	noneMode := node.GetInterceptionMode() == model.InterceptionNone
-
-	actualWildcard, _ := getActualWildcardAndLocalHost(node)
-
-	listeners = configgen.generateManagementListeners(node, noneMode, env, listeners)
-
-	tcpProxy := &tcp_proxy.TcpProxy{
-		StatPrefix:       util.BlackHoleCluster,
-		ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.BlackHoleCluster},
-	}
-
-	if env.Mesh.OutboundTrafficPolicy.Mode == meshconfig.MeshConfig_OutboundTrafficPolicy_ALLOW_ANY {
-		// We need a passthrough filter to fill in the filter stack for orig_dst listener
-		tcpProxy = &tcp_proxy.TcpProxy{
-			StatPrefix:       util.PassthroughCluster,
-			ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.PassthroughCluster},
-		}
-		setAccessLog(env, node, tcpProxy)
-	}
-	var transparent *google_protobuf.BoolValue
-	if node.GetInterceptionMode() == model.InterceptionTproxy {
-		transparent = proto.BoolTrue
-	}
-
-	filter := listener.Filter{
-		Name: xdsutil.TCPProxy,
-	}
-
-	if util.IsXDSMarshalingToAnyEnabled(node) {
-		filter.ConfigType = &listener.Filter_TypedConfig{TypedConfig: util.MessageToAny(tcpProxy)}
-	} else {
-		filter.ConfigType = &listener.Filter_Config{Config: util.MessageToStruct(tcpProxy)}
-	}
-
-	// add an extra listener that binds to the port that is the recipient of the iptables redirect
-	outboundVirtualListener := xdsapi.Listener{
-		Name:           VirtualListenerName,
-		Address:        util.BuildAddress(actualWildcard, uint32(env.Mesh.ProxyListenPort)),
-		Transparent:    transparent,
-		UseOriginalDst: proto.BoolTrue,
-		FilterChains: []listener.FilterChain{
-			{
-				Filters: []listener.Filter{filter},
-			},
-		},
-	}
-	listeners = append(listeners, &outboundVirtualListener)
-
-	if shouldSplitInOutBound {
-		inboundListener := outboundVirtualListener
-		inboundListener.Name = VirtualInboundListenerName
-		inboundListener.Address = util.BuildAddress(actualWildcard, ProxyInboundListenPort)
-		listeners = append(listeners, &inboundListener)
-	}
-
-	return listeners
-}
-
 // buildSidecarListeners produces a list of listeners for sidecar proxies
 func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environment, node *model.Proxy,
 	push *model.PushContext) ([]*xdsapi.Listener, error) {
@@ -278,14 +201,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environme
 	_, actualLocalHostAddress := getActualWildcardAndLocalHost(node)
 
 	if mesh.ProxyListenPort > 0 {
-		inbound := configgen.buildSidecarInboundListeners(env, node, push, proxyInstances)
-		outbound := configgen.buildSidecarOutboundListeners(env, node, push, proxyInstances)
-		listeners = configgen.mergeInOutBoundListeners(
-			env, node, push,
-			inbound, outbound,
-			node.IsInboundOutboundListenerSplitEnabled(),
-			false,
-			false)
+		listeners = new(ListenerBuilder).buildSidecarInboundListeners(configgen, env, node, push, proxyInstances).buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).buildManagementListeners(configgen, env, node, push, proxyInstances).buildVirtualListener(env, node).buildInboundSplitListener(env, node).getListeners()
 	}
 
 	httpProxyPort := mesh.ProxyHttpPort
@@ -1264,44 +1180,6 @@ func (configgen *ConfigGeneratorImpl) buildSidecarOutboundListenerForPortOrUDS(l
 		}
 		log.Debugf("buildSidecarOutboundListeners: multiple filter chain listener %s with %d chains", mutable.Listener.Name, numChains)
 	}
-}
-
-func (configgen *ConfigGeneratorImpl) generateManagementListeners(node *model.Proxy, noneMode bool,
-	env *model.Environment, listeners []*xdsapi.Listener) []*xdsapi.Listener {
-	// Do not generate any management port listeners if the user has specified a SidecarScope object
-	// with ingress listeners. Specifying the ingress listener implies that the user wants
-	// to only have those specific listeners and nothing else, in the inbound path.
-	generateManagementListeners := true
-	sidecarScope := node.SidecarScope
-	if sidecarScope != nil && sidecarScope.HasCustomIngressListeners ||
-		noneMode {
-		generateManagementListeners = false
-	}
-	if generateManagementListeners {
-		// Let ServiceDiscovery decide which IP and Port are used for management if
-		// there are multiple IPs
-		mgmtListeners := make([]*xdsapi.Listener, 0)
-		for _, ip := range node.IPAddresses {
-			managementPorts := env.ManagementPorts(ip)
-			management := buildSidecarInboundMgmtListeners(node, env, managementPorts, ip)
-			mgmtListeners = append(mgmtListeners, management...)
-		}
-
-		// If management listener port and service port are same, bad things happen
-		// when running in kubernetes, as the probes stop responding. So, append
-		// non overlapping listeners only.
-		for i := range mgmtListeners {
-			m := mgmtListeners[i]
-			l := util.GetByAddress(listeners, m.Address.String())
-			if l != nil {
-				log.Warnf("Omitting listener for management address %s (%s) due to collision with service listener %s (%s)",
-					m.Name, m.Address.String(), l.Name, l.Address.String())
-				continue
-			}
-			listeners = append(listeners, m)
-		}
-	}
-	return listeners
 }
 
 // Deprecated: buildSidecarInboundMgmtListeners creates inbound TCP only listeners for the management ports on
