@@ -17,6 +17,7 @@ package interception
 import (
 	"fmt"
 	"istio.io/istio/pilot/pkg/model"
+	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/test/echo/common/scheme"
 	"istio.io/istio/pkg/test/framework/components/echo"
 	"istio.io/istio/pkg/test/framework/components/echo/echoboot"
@@ -26,6 +27,7 @@ import (
 	"istio.io/istio/pkg/test/framework/resource"
 	"istio.io/istio/pkg/test/util/retry"
 	"istio.io/istio/tests/integration/security/util/connection"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,6 +130,9 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 	})
 
 	inoutUnitedApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
+	log.Infof("Ready: %s", inoutUnitedApp0.Config().Service)
+	inoutSplitApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
+	log.Infof("Ready: %s", inoutSplitApp0.Config().Service)
 
 	connectivityPairs := []appConnectionPair{
 		// source is inout united
@@ -148,7 +153,7 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 			From: pair.src,
 			Options: echo.CallOptions{
 				Target:   pair.dst,
-				PortName: string(scheme.HTTP),
+				PortName: strings.ToLower(string(scheme.HTTP)),
 				Scheme:   scheme.HTTP,
 			},
 			ExpectSuccess: true,
@@ -158,6 +163,7 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 			pair.src.Config().Service,
 			pair.dst.Config().Service,
 			connChecker.Options.PortName)
+
 		t.Run(subTestName,
 			func(t *testing.T) {
 				retry.UntilSuccessOrFail(t, connChecker.Check,
