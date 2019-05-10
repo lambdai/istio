@@ -13,12 +13,21 @@ import (
 	"istio.io/istio/pkg/proto"
 )
 
+// A stateful listener builder
 type ListenerBuilder struct {
+	node                   *model.Proxy
 	inboundListeners       []*xdsapi.Listener
 	outboundListeners      []*xdsapi.Listener
 	managementListeners    []*xdsapi.Listener
 	virtualListener        *xdsapi.Listener
 	virtualInboundListener *xdsapi.Listener
+}
+
+func NewListenerBuilder(node *model.Proxy) *ListenerBuilder {
+	builder := &ListenerBuilder{
+		node: node,
+	}
+	return builder
 }
 
 func (builder *ListenerBuilder) buildSidecarInboundListeners(
@@ -77,15 +86,18 @@ func (builder *ListenerBuilder) buildManagementListeners(configgen *ConfigGenera
 		m := mgmtListeners[i]
 		addressString := m.Address.String()
 		existingListener, ok := addresses[addressString]
-		if !ok {
+		if ok {
 			log.Warnf("Omitting listener for management address %s (%s) due to collision with service listener (%s)",
 				m.Name, m.Address.String(), existingListener.Name)
 			continue
+		} else {
+			// dedup management listeners as well
+			addresses[addressString] = m
+			builder.managementListeners = append(builder.managementListeners, m)
 		}
-		builder.managementListeners = append(builder.managementListeners, m)
+
 	}
 	return builder
-
 }
 
 func (builder *ListenerBuilder) buildVirtualListener(
@@ -112,6 +124,7 @@ func (builder *ListenerBuilder) buildVirtualListener(
 	}
 	return builder
 }
+
 func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment, node *model.Proxy) *ListenerBuilder {
 	shouldSplitInOutBound := node.IsInboundOutboundListenerSplitEnabled()
 	if !shouldSplitInOutBound {
@@ -139,8 +152,19 @@ func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment
 	}
 	return builder
 }
+
 func (builder *ListenerBuilder) getListeners() []*xdsapi.Listener {
-	listeners := make([]*xdsapi.Listener, 0, len(builder.inboundListeners)+len(builder.outboundListeners)+len(builder.managementListeners)+2)
+	nInbound, nOutbound, nManagement := len(builder.inboundListeners), len(builder.outboundListeners), len(builder.managementListeners)
+	nVirtual, nVirtualInbound := 0, 0
+	if builder.virtualListener != nil {
+		nVirtual = 1
+	}
+	if builder.virtualInboundListener != nil {
+		nVirtualInbound = 1
+	}
+	nListener := nInbound + nOutbound + nManagement + nVirtual + nVirtualInbound
+
+	listeners := make([]*xdsapi.Listener, 0, nListener)
 	listeners = append(listeners, builder.inboundListeners...)
 	listeners = append(listeners, builder.outboundListeners...)
 	listeners = append(listeners, builder.managementListeners...)
@@ -150,6 +174,12 @@ func (builder *ListenerBuilder) getListeners() []*xdsapi.Listener {
 	if builder.virtualInboundListener != nil {
 		listeners = append(listeners, builder.virtualInboundListener)
 	}
+
+	log.Debugf("Build %d listeners for node %s including %d inbound, %d outbound, %d management, %d virtual and %d virtual inbound listeners",
+		nListener,
+		builder.node.ID,
+		nInbound, nOutbound, nManagement,
+		nVirtual, nVirtualInbound)
 	return listeners
 }
 

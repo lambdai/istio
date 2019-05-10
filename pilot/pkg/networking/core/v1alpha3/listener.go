@@ -201,7 +201,14 @@ func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environme
 	_, actualLocalHostAddress := getActualWildcardAndLocalHost(node)
 
 	if mesh.ProxyListenPort > 0 {
-		listeners = new(ListenerBuilder).buildSidecarInboundListeners(configgen, env, node, push, proxyInstances).buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).buildManagementListeners(configgen, env, node, push, proxyInstances).buildVirtualListener(env, node).buildInboundSplitListener(env, node).getListeners()
+		// Any build order change need a careful code review
+		listeners = NewListenerBuilder(node).
+			buildSidecarInboundListeners(configgen, env, node, push, proxyInstances).
+			buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).
+			buildManagementListeners(configgen, env, node, push, proxyInstances).
+			buildVirtualListener(env, node).
+			buildInboundSplitListener(env, node).
+			getListeners()
 	}
 
 	httpProxyPort := mesh.ProxyHttpPort
