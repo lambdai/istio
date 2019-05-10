@@ -139,7 +139,7 @@ func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment
 	tcpProxyFilter := newTcpProxyListenerFilter(env, node)
 	actualWildcard, _ := getActualWildcardAndLocalHost(node)
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
-	builder.virtualListener = &xdsapi.Listener{
+	builder.virtualInboundListener = &xdsapi.Listener{
 		Name:           VirtualInboundListenerName,
 		Address:        util.BuildAddress(actualWildcard, ProxyInboundListenPort),
 		Transparent:    isTransparentProxy,
