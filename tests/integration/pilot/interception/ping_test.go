@@ -16,24 +16,24 @@ package interception
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/test/echo/common/scheme"
+	"istio.io/istio/pkg/test/framework"
 	"istio.io/istio/pkg/test/framework/components/echo"
 	"istio.io/istio/pkg/test/framework/components/echo/echoboot"
+	"istio.io/istio/pkg/test/framework/components/environment"
 	"istio.io/istio/pkg/test/framework/components/galley"
+	"istio.io/istio/pkg/test/framework/components/istio"
 	"istio.io/istio/pkg/test/framework/components/namespace"
 	"istio.io/istio/pkg/test/framework/components/pilot"
 	"istio.io/istio/pkg/test/framework/resource"
 	"istio.io/istio/pkg/test/util/retry"
 	"istio.io/istio/tests/integration/security/util/connection"
-	"strings"
-	"testing"
-	"time"
-
-	"istio.io/istio/pkg/test/framework"
-	"istio.io/istio/pkg/test/framework/components/environment"
-	"istio.io/istio/pkg/test/framework/components/istio"
 )
 
 var (
@@ -73,9 +73,6 @@ func TestReachability(t *testing.T) {
 }
 
 func doTest(t *testing.T, ctx framework.TestContext) {
-
-	//istioCfg := istio.DefaultConfigOrFail(t, ctx)
-	//systemNS := namespace.ClaimOrFail(t, ctx, istioCfg.SystemNamespace)
 	ns := namespace.NewOrFail(t, ctx, "inboundsplit", true)
 
 	ports := []echo.Port{
@@ -130,9 +127,9 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 	})
 
 	inoutUnitedApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
-	log.Infof("Ready: %s", inoutUnitedApp0.Config().Service)
+	log.Infof("%s app ready: %s", ctx.Name(), inoutUnitedApp0.Config().Service)
 	inoutSplitApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
-	log.Infof("Ready: %s", inoutSplitApp0.Config().Service)
+	log.Infof("%s app ready: %s", ctx.Name(), inoutSplitApp0.Config().Service)
 
 	connectivityPairs := []appConnectionPair{
 		// source is inout united
