@@ -6,6 +6,7 @@ import (
 	tcp_proxy "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
 	xdsutil "github.com/envoyproxy/go-control-plane/pkg/util"
 	google_protobuf "github.com/gogo/protobuf/types"
+
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/util"
@@ -45,9 +46,9 @@ func (builder *ListenerBuilder) buildSidecarOutboundListeners(configgen *ConfigG
 	return builder
 }
 
-func (builder *ListenerBuilder) buildManagementListeners(configgen *ConfigGeneratorImpl,
-	env *model.Environment, node *model.Proxy, push *model.PushContext,
-	proxyInstances []*model.ServiceInstance) *ListenerBuilder {
+func (builder *ListenerBuilder) buildManagementListeners(_ *ConfigGeneratorImpl,
+	env *model.Environment, node *model.Proxy, _ *model.PushContext,
+	_ []*model.ServiceInstance) *ListenerBuilder {
 
 	noneMode := node.GetInterceptionMode() == model.InterceptionNone
 
