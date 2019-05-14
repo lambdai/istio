@@ -103,6 +103,8 @@ func init() {
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Mesh.ConfigFile, "meshConfig", "/etc/istio/config/mesh",
 		fmt.Sprintf("File name for Istio mesh configuration. If not specified, a default mesh will be used."))
+	discoveryCmd.PersistentFlags().Uint32Var(&serverArgs.Mesh.InboundListenPort, "proxyInboundListenPort", 15006,
+		"Sidecar proxy inbound traffic capture port")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.NetworksConfigFile, "networksConfig", "/etc/istio/config/meshNetworks",
 		fmt.Sprintf("File name for Istio mesh networks configuration. If not specified, a default mesh networks will be used."))
 	discoveryCmd.PersistentFlags().StringVarP(&serverArgs.Namespace, "namespace", "n", "",
