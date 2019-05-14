@@ -58,10 +58,6 @@ const (
 	// VirtualListenerName is the name for traffic capture listener
 	VirtualInboundListenerName = "virtualInbound"
 
-	// A dedicated inbound traffic capture port for sidecar proxy.
-	// See also `MeshConfig.ProxyListenPort`.
-	ProxyInboundListenPort = 15006
-
 	// WildcardAddress binds to all IP addresses
 	WildcardAddress = "0.0.0.0"
 
@@ -115,6 +111,10 @@ var (
 			"upstream_transport_failure_reason": {Kind: &google_protobuf.Value_StringValue{StringValue: "%UPSTREAM_TRANSPORT_FAILURE_REASON%"}},
 		},
 	}
+
+	// A dedicated inbound traffic capture port for sidecar proxy.
+	// See also `MeshConfig.ProxyListenPort`.
+	ProxyInboundListenPort uint32 = 15006
 )
 
 func buildAccessLog(fl *fileaccesslog.FileAccessLog, env *model.Environment) {
@@ -198,17 +198,70 @@ func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environme
 	noneMode := node.GetInterceptionMode() == model.InterceptionNone
 	listeners := make([]*xdsapi.Listener, 0)
 
-	_, actualLocalHostAddress := getActualWildcardAndLocalHost(node)
+	actualWildcard, actualLocalHostAddress := getActualWildcardAndLocalHost(node)
 
 	if mesh.ProxyListenPort > 0 {
-		// Any build order change need a careful code review
-		listeners = NewListenerBuilder(node).
-			buildSidecarInboundListeners(configgen, env, node, push, proxyInstances).
-			buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).
-			buildManagementListeners(configgen, env, node, push, proxyInstances).
-			buildVirtualListener(env, node).
-			buildInboundSplitListener(env, node).
-			getListeners()
+		// Notes that the the else branch works for both split and non-split cases.
+		// TODO(silentdai): remove `if` branch once split behavior is well verified
+		if !node.IsInboundOutboundListenerSplitEnabled() {
+			inbound := configgen.buildSidecarInboundListeners(env, node, push, proxyInstances)
+			outbound := configgen.buildSidecarOutboundListeners(env, node, push, proxyInstances)
+
+			listeners = append(listeners, inbound...)
+			listeners = append(listeners, outbound...)
+
+			listeners = configgen.generateManagementListeners(node, noneMode, env, listeners)
+
+			tcpProxy := &tcp_proxy.TcpProxy{
+				StatPrefix:       util.BlackHoleCluster,
+				ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.BlackHoleCluster},
+			}
+
+			if mesh.OutboundTrafficPolicy.Mode == meshconfig.MeshConfig_OutboundTrafficPolicy_ALLOW_ANY {
+				// We need a passthrough filter to fill in the filter stack for orig_dst listener
+				tcpProxy = &tcp_proxy.TcpProxy{
+					StatPrefix:       util.PassthroughCluster,
+					ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.PassthroughCluster},
+				}
+				setAccessLog(env, node, tcpProxy)
+			}
+			var transparent *google_protobuf.BoolValue
+			if node.GetInterceptionMode() == model.InterceptionTproxy {
+				transparent = proto.BoolTrue
+			}
+
+			filter := listener.Filter{
+				Name: xdsutil.TCPProxy,
+			}
+
+			if util.IsXDSMarshalingToAnyEnabled(node) {
+				filter.ConfigType = &listener.Filter_TypedConfig{TypedConfig: util.MessageToAny(tcpProxy)}
+			} else {
+				filter.ConfigType = &listener.Filter_Config{Config: util.MessageToStruct(tcpProxy)}
+			}
+
+			// add an extra listener that binds to the port that is the recipient of the iptables redirect
+			listeners = append(listeners, &xdsapi.Listener{
+				Name:           VirtualListenerName,
+				Address:        util.BuildAddress(actualWildcard, uint32(mesh.ProxyListenPort)),
+				Transparent:    transparent,
+				UseOriginalDst: proto.BoolTrue,
+				FilterChains: []listener.FilterChain{
+					{
+						Filters: []listener.Filter{filter},
+					},
+				},
+			})
+		} else {
+			// Any build order change need a careful code review
+			listeners = NewListenerBuilder(node).
+				buildSidecarInboundListeners(configgen, env, node, push, proxyInstances).
+				buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).
+				buildManagementListeners(configgen, env, node, push, proxyInstances).
+				buildVirtualListener(env, node).
+				buildInboundSplitListener(env, node).
+				getListeners()
+		}
 	}
 
 	httpProxyPort := mesh.ProxyHttpPort
@@ -1187,6 +1240,45 @@ func (configgen *ConfigGeneratorImpl) buildSidecarOutboundListenerForPortOrUDS(l
 		}
 		log.Debugf("buildSidecarOutboundListeners: multiple filter chain listener %s with %d chains", mutable.Listener.Name, numChains)
 	}
+}
+
+// TODO(silentdai): duplicate with listener_builder.go. Remove this one once split is verified.
+func (configgen *ConfigGeneratorImpl) generateManagementListeners(node *model.Proxy, noneMode bool,
+	env *model.Environment, listeners []*xdsapi.Listener) []*xdsapi.Listener {
+	// Do not generate any management port listeners if the user has specified a SidecarScope object
+	// with ingress listeners. Specifying the ingress listener implies that the user wants
+	// to only have those specific listeners and nothing else, in the inbound path.
+	generateManagementListeners := true
+	sidecarScope := node.SidecarScope
+	if sidecarScope != nil && sidecarScope.HasCustomIngressListeners ||
+		noneMode {
+		generateManagementListeners = false
+	}
+	if generateManagementListeners {
+		// Let ServiceDiscovery decide which IP and Port are used for management if
+		// there are multiple IPs
+		mgmtListeners := make([]*xdsapi.Listener, 0)
+		for _, ip := range node.IPAddresses {
+			managementPorts := env.ManagementPorts(ip)
+			management := buildSidecarInboundMgmtListeners(node, env, managementPorts, ip)
+			mgmtListeners = append(mgmtListeners, management...)
+		}
+
+		// If management listener port and service port are same, bad things happen
+		// when running in kubernetes, as the probes stop responding. So, append
+		// non overlapping listeners only.
+		for i := range mgmtListeners {
+			m := mgmtListeners[i]
+			l := util.GetByAddress(listeners, m.Address.String())
+			if l != nil {
+				log.Warnf("Omitting listener for management address %s (%s) due to collision with service listener %s (%s)",
+					m.Name, m.Address.String(), l.Name, l.Address.String())
+				continue
+			}
+			listeners = append(listeners, m)
+		}
+	}
+	return listeners
 }
 
 // Deprecated: buildSidecarInboundMgmtListeners creates inbound TCP only listeners for the management ports on
