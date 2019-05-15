@@ -126,7 +126,7 @@ func (builder *ListenerBuilder) buildVirtualListener(
 	return builder
 }
 
-func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment, node *model.Proxy) *ListenerBuilder {
+func (builder *ListenerBuilder) buildVirtualInboundListener(env *model.Environment, node *model.Proxy) *ListenerBuilder {
 	shouldSplitInOutBound := node.IsInboundCaptureAllPorts()
 	if !shouldSplitInOutBound {
 		log.Debugf("Inbound and outbound listeners are united in for node %s", node.ID)

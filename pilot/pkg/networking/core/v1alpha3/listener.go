@@ -259,7 +259,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environme
 				buildSidecarOutboundListeners(configgen, env, node, push, proxyInstances).
 				buildManagementListeners(configgen, env, node, push, proxyInstances).
 				buildVirtualListener(env, node).
-				buildInboundSplitListener(env, node).
+				buildVirtualInboundListener(env, node).
 				getListeners()
 		}
 	}
