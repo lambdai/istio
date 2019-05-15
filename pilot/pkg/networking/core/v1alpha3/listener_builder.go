@@ -109,7 +109,7 @@ func (builder *ListenerBuilder) buildVirtualListener(
 		isTransparentProxy = proto.BoolTrue
 	}
 
-	tcpProxyFilter := newTcpProxyListenerFilter(env, node, false)
+	tcpProxyFilter := newTCPProxyListenerFilter(env, node, false)
 	actualWildcard, _ := getActualWildcardAndLocalHost(node)
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	builder.virtualListener = &xdsapi.Listener{
@@ -137,7 +137,7 @@ func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment
 		isTransparentProxy = proto.BoolTrue
 	}
 
-	tcpProxyFilter := newTcpProxyListenerFilter(env, node, true)
+	tcpProxyFilter := newTCPProxyListenerFilter(env, node, true)
 	actualWildcard, _ := getActualWildcardAndLocalHost(node)
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	builder.virtualInboundListener = &xdsapi.Listener{
@@ -184,7 +184,7 @@ func (builder *ListenerBuilder) getListeners() []*xdsapi.Listener {
 	return listeners
 }
 
-func newTcpProxyListenerFilter(env *model.Environment, node *model.Proxy, isInboundListener bool) *listener.Filter {
+func newTCPProxyListenerFilter(env *model.Environment, node *model.Proxy, isInboundListener bool) *listener.Filter {
 	tcpProxy := &tcp_proxy.TcpProxy{
 		StatPrefix:       util.BlackHoleCluster,
 		ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.BlackHoleCluster},
