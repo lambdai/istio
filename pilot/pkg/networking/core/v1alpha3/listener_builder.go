@@ -109,7 +109,7 @@ func (builder *ListenerBuilder) buildVirtualListener(
 		isTransparentProxy = proto.BoolTrue
 	}
 
-	tcpProxyFilter := newTcpProxyListenerFilter(env, node)
+	tcpProxyFilter := newTcpProxyListenerFilter(env, node, false)
 	actualWildcard, _ := getActualWildcardAndLocalHost(node)
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	builder.virtualListener = &xdsapi.Listener{
@@ -127,7 +127,7 @@ func (builder *ListenerBuilder) buildVirtualListener(
 }
 
 func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment, node *model.Proxy) *ListenerBuilder {
-	shouldSplitInOutBound := node.IsInboundOutboundListenerSplitEnabled()
+	shouldSplitInOutBound := node.IsInboundCaptureAllPorts()
 	if !shouldSplitInOutBound {
 		log.Debugf("Inbound and outbound listeners are united in for node %s", node.ID)
 		return builder
@@ -137,7 +137,7 @@ func (builder *ListenerBuilder) buildInboundSplitListener(env *model.Environment
 		isTransparentProxy = proto.BoolTrue
 	}
 
-	tcpProxyFilter := newTcpProxyListenerFilter(env, node)
+	tcpProxyFilter := newTcpProxyListenerFilter(env, node, true)
 	actualWildcard, _ := getActualWildcardAndLocalHost(node)
 	// add an extra listener that binds to the port that is the recipient of the iptables redirect
 	builder.virtualInboundListener = &xdsapi.Listener{
@@ -184,13 +184,14 @@ func (builder *ListenerBuilder) getListeners() []*xdsapi.Listener {
 	return listeners
 }
 
-func newTcpProxyListenerFilter(env *model.Environment, node *model.Proxy) *listener.Filter {
+func newTcpProxyListenerFilter(env *model.Environment, node *model.Proxy, isInboundListener bool) *listener.Filter {
 	tcpProxy := &tcp_proxy.TcpProxy{
 		StatPrefix:       util.BlackHoleCluster,
 		ClusterSpecifier: &tcp_proxy.TcpProxy_Cluster{Cluster: util.BlackHoleCluster},
 	}
 
-	if env.Mesh.OutboundTrafficPolicy.Mode == meshconfig.MeshConfig_OutboundTrafficPolicy_ALLOW_ANY {
+	if env.Mesh.OutboundTrafficPolicy.Mode == meshconfig.MeshConfig_OutboundTrafficPolicy_ALLOW_ANY ||
+		isInboundListener {
 		// We need a passthrough filter to fill in the filter stack for orig_dst listener
 		tcpProxy = &tcp_proxy.TcpProxy{
 			StatPrefix:       util.PassthroughCluster,

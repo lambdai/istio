@@ -395,8 +395,7 @@ const (
 	// IstioIngressNamespace is the namespace where Istio ingress controller is deployed
 	IstioIngressNamespace = "istio-system"
 
-	// IstioInboundInterceptionSplit is the key indicating whether proxy wants inbound/outbound listener split
-	IstioInboundInterceptionSplit = "INBOUND_INTERCEPTION_SPLIT"
+	IstioInboundCaptureAllPort = "INBOUND_CAPTURE_ALL_PORT"
 )
 
 // IstioIngressWorkloadLabels is the label assigned to Istio ingress pods
@@ -663,11 +662,11 @@ func (node *Proxy) GetInterceptionMode() TrafficInterceptionMode {
 	return InterceptionRedirect
 }
 
-// Inbound interception split mode only supports iptables REDIRECT
-func (node *Proxy) IsInboundOutboundListenerSplitEnabled() bool {
+// Inbound capture listener capture all port mode only supports iptables REDIRECT
+func (node *Proxy) IsInboundCaptureAllPorts() bool {
 	if node.GetInterceptionMode() != InterceptionRedirect {
 		return false
 	}
-	_, ok := node.Metadata[IstioInboundInterceptionSplit]
+	_, ok := node.Metadata[IstioInboundCaptureAllPort]
 	return ok
 }

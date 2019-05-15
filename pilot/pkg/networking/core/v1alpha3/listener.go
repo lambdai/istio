@@ -112,7 +112,7 @@ var (
 		},
 	}
 
-	// A dedicated inbound traffic capture port for sidecar proxy.
+	// ProxyInboundListenPort is the dedicated inbound traffic capture port for sidecar proxy.
 	// See also `MeshConfig.ProxyListenPort`.
 	ProxyInboundListenPort uint32 = 15006
 )
@@ -203,7 +203,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarListeners(env *model.Environme
 	if mesh.ProxyListenPort > 0 {
 		// Notes that the the else branch works for both split and non-split cases.
 		// TODO(silentdai): remove `if` branch once split behavior is well verified
-		if !node.IsInboundOutboundListenerSplitEnabled() {
+		if !node.IsInboundCaptureAllPorts() {
 			inbound := configgen.buildSidecarInboundListeners(env, node, push, proxyInstances)
 			outbound := configgen.buildSidecarOutboundListeners(env, node, push, proxyInstances)
 

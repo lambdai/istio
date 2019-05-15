@@ -34,7 +34,7 @@ import (
 	"github.com/gogo/protobuf/types"
 	middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/go-multierror"
 	prom "github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -58,7 +58,6 @@ import (
 	configmonitor "istio.io/istio/pilot/pkg/config/monitor"
 	"istio.io/istio/pilot/pkg/model"
 	istio_networking "istio.io/istio/pilot/pkg/networking/core"
-	istio_networking_generator "istio.io/istio/pilot/pkg/networking/core/v1alpha3"
 	"istio.io/istio/pilot/pkg/networking/plugin"
 	"istio.io/istio/pilot/pkg/networking/util"
 	"istio.io/istio/pilot/pkg/proxy/envoy"
@@ -132,10 +131,9 @@ func init() {
 // MeshArgs provide configuration options for the mesh. If ConfigFile is provided, an attempt will be made to
 // load the mesh from the file. Otherwise, a default mesh will be used with optional overrides.
 type MeshArgs struct {
-	ConfigFile        string
-	MixerAddress      string
-	RdsRefreshDelay   *types.Duration
-	InboundListenPort uint32
+	ConfigFile      string
+	MixerAddress    string
+	RdsRefreshDelay *types.Duration
 }
 
 // ConfigArgs provide configuration options for the configuration controller. If FileDir is set, that directory will
@@ -368,8 +366,6 @@ func (s *Server) initMesh(args *PilotArgs) error {
 	}
 	var mesh *meshconfig.MeshConfig
 	var err error
-
-	istio_networking_generator.ProxyInboundListenPort = args.Mesh.InboundListenPort
 
 	if args.Mesh.ConfigFile != "" {
 		mesh, err = cmd.ReadMeshConfig(args.Mesh.ConfigFile)
