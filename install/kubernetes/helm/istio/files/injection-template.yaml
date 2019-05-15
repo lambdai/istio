@@ -47,7 +47,7 @@ initContainers:
     {{- end }}
   restartPolicy: Always
   env:
-  {{- if eq "*" (annotation .ObjectMeta `sidecar.istio.io/includeInboundPorts` "DEFAULT_AS_NOT_STAR") }}
+  {{- if contains "*" (annotation .ObjectMeta `traffic.sidecar.istio.io/includeInboundPorts` "DEFAULT_AS_NOT_STAR") }}
   - name: INBOUND_CAPTURE_PORT
     value: 15006
   {{- end }}
@@ -182,7 +182,7 @@ containers:
         fieldPath: metadata.namespace
   - name: ISTIO_META_INTERCEPTION_MODE
     value: "{{ or (index .ObjectMeta.Annotations `sidecar.istio.io/interceptionMode`) .ProxyConfig.InterceptionMode.String }}"
-{{ if eq "*" (annotation .ObjectMeta `sidecar.istio.io/includeInboundPorts` `DEFAULT_AS_NOT_START`) }}
+{{ if contains "*" (annotation .ObjectMeta `traffic.sidecar.istio.io/includeInboundPorts` `DEFAULT_AS_NOT_STAR`) }}
   - name: ISTIO_META_INBOUND_CAPTURE_ALL_PORT
     value: true
 {{ end }}

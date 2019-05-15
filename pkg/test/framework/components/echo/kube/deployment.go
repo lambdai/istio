@@ -80,15 +80,14 @@ spec:
         istio-locality: {{ .Locality }}
 {{- end }}
       annotations:
+        foo: bar
 {{- if .WorkloadAnnotations }}
 {{- range $name, $value := .WorkloadAnnotations }}
-       {{ $name }}: {{ printf "%q" $value }}
+        {{ $name }}: {{ printf "%q" $value }}
 {{- end }}
-{{- if not .Sidecar }}
-        sidecar.istio.io/inject: "false"
 {{- end }}
-{{- if .InboundInterceptionSplit }}
-        sidecar.istio.io/inboundInterceptionSplit: "true"
+{{- if .IncludeInboundPorts }}
+        traffic.sidecar.istio.io/includeInboundPorts: "{{ .IncludeInboundPorts }}"
 {{- end }}
     spec:
 {{- if .ServiceAccount }}
@@ -148,7 +147,6 @@ UVoCqQmzjPoB3c3JoYFpJo-9jTN1_mNRtZUcNvYl-tDlTmBlaKEvoC5P2WGVUF3AoLsES66u4FG9Wllm
 LV92LG1WNqx_ltkT1tahSy9WiHQgyzPqwtwE72T1jAGdgVIoJy1lfSaLam_bo9rqkRlgSg-au9BAjZiD\
 Gtm9tf3lwrcgfbxccdlG4jAsTFa2aNs3dW4NLk7mFnWCJa-iWj-TgFxf9TW-9XPK0g3oYIQ0Id0CIW2S\
 iFxKGPAjB-g"
----
 `
 )
 
@@ -185,19 +183,19 @@ func generateYAML(cfg echo.Config) (string, error) {
 	}
 
 	params := map[string]interface{}{
-		"Hub":                      settings.Hub,
-		"Tag":                      settings.Tag,
-		"PullPolicy":               settings.PullPolicy,
-		"Service":                  cfg.Service,
-		"Version":                  cfg.Version,
-		"Headless":                 cfg.Headless,
-		"Locality":                 cfg.Locality,
-		"ServiceAccount":           cfg.ServiceAccount,
-		"Ports":                    cfg.Ports,
-		"ContainerPorts":           getContainerPorts(cfg.Ports),
-		"ServiceAnnotations":       serviceAnnotations,
-		"WorkloadAnnotations":      workloadAnnotations,
-		"InboundInterceptionSplit": cfg.InboundInterceptionSplit,
+		"Hub":                 settings.Hub,
+		"Tag":                 settings.Tag,
+		"PullPolicy":          settings.PullPolicy,
+		"Service":             cfg.Service,
+		"Version":             cfg.Version,
+		"Headless":            cfg.Headless,
+		"Locality":            cfg.Locality,
+		"ServiceAccount":      cfg.ServiceAccount,
+		"Ports":               cfg.Ports,
+		"ContainerPorts":      getContainerPorts(cfg.Ports),
+		"ServiceAnnotations":  serviceAnnotations,
+		"WorkloadAnnotations": workloadAnnotations,
+		"IncludeInboundPorts": cfg.IncludeInboundPorts,
 	}
 
 	// Generate the YAML content.

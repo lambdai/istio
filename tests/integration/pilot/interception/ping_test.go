@@ -86,49 +86,44 @@ func doTest(t *testing.T, ctx framework.TestContext) {
 		},
 	}
 
-	inoutUnitedApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:                  "inoutunitedapp0",
-		Namespace:                ns,
-		Sidecar:                  true,
-		Ports:                    ports,
-		Galley:                   g,
-		Pilot:                    p,
-		InboundInterceptionSplit: false,
-	})
+	var inoutUnitedApp0, inoutUnitedApp1, inoutSplitApp0, inoutSplitApp1 echo.Instance
+	echoboot.NewBuilderOrFail(t, ctx).
+		With(&inoutSplitApp0, echo.Config{
+			Service:             "inoutsplitapp0",
+			Namespace:           ns,
+			Ports:               ports,
+			Galley:              g,
+			Pilot:               p,
+			IncludeInboundPorts: "*",
+		}).
+		With(&inoutSplitApp1, echo.Config{
+			Service:             "inoutsplitapp1",
+			Namespace:           ns,
+			Ports:               ports,
+			Galley:              g,
+			Pilot:               p,
+			IncludeInboundPorts: "*",
+		}).
+		With(
+			&inoutUnitedApp0, echo.Config{
+				Service:   "inoutunitedapp0",
+				Namespace: ns,
+				Ports:     ports,
+				Galley:    g,
+				Pilot:     p,
+			}).
+		With(&inoutUnitedApp1, echo.Config{
+			Service:   "inoutunitedapp1",
+			Namespace: ns,
+			Ports:     ports,
+			Galley:    g,
+			Pilot:     p,
+		}).
+		BuildOrFail(ctx)
 
-	inoutUnitedApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:                  "inoutunitedapp1",
-		Namespace:                ns,
-		Sidecar:                  true,
-		Ports:                    ports,
-		Galley:                   g,
-		Pilot:                    p,
-		InboundInterceptionSplit: false,
-	})
-
-	inoutSplitApp0 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:                  "inoutsplitapp0",
-		Namespace:                ns,
-		Sidecar:                  true,
-		Ports:                    ports,
-		Galley:                   g,
-		Pilot:                    p,
-		InboundInterceptionSplit: true,
-	})
-
-	inoutSplitApp1 := echoboot.NewOrFail(t, ctx, echo.Config{
-		Service:                  "inoutsplitapp1",
-		Namespace:                ns,
-		Sidecar:                  true,
-		Ports:                    ports,
-		Galley:                   g,
-		Pilot:                    p,
-		InboundInterceptionSplit: true,
-	})
-
-	inoutUnitedApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
-	log.Infof("%s app ready: %s", ctx.Name(), inoutUnitedApp0.Config().Service)
-	inoutSplitApp0.WaitUntilReadyOrFail(t, inoutUnitedApp1)
+	inoutUnitedApp0.WaitUntilCallableOrFail(t, inoutUnitedApp1)
+	log.Infof("%s app ready: %s", ctx.Name(), inoutSplitApp0.Config().Service)
+	inoutSplitApp0.WaitUntilCallableOrFail(t, inoutUnitedApp1)
 	log.Infof("%s app ready: %s", ctx.Name(), inoutSplitApp0.Config().Service)
 
 	connectivityPairs := []appConnectionPair{

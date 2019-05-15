@@ -60,8 +60,9 @@ type Config struct {
 	// Annotations provides metadata hints for deployment of the instance.
 	Annotations Annotations
 
-	// true if the inbound and outbound capture port are separated
-	InboundInterceptionSplit bool
+	// IncludeInboundPorts provides the ports that inbound listener should capture
+	// "*" means capture all.
+	IncludeInboundPorts string
 }
 
 // String implements the Configuration interface (which implements fmt.Stringer)
