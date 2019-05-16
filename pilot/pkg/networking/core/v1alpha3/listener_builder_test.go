@@ -15,10 +15,11 @@
 package v1alpha3
 
 import (
-	"istio.io/istio/pilot/pkg/model"
-	"istio.io/istio/pilot/pkg/networking/plugin"
 	"strings"
 	"testing"
+
+	"istio.io/istio/pilot/pkg/model"
+	"istio.io/istio/pilot/pkg/networking/plugin"
 )
 
 type LdsEnv struct {
