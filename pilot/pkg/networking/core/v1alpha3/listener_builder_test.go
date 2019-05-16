@@ -15,12 +15,10 @@
 package v1alpha3
 
 import (
-	"strings"
-	"testing"
-	"time"
-
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking/plugin"
+	"strings"
+	"testing"
 )
 
 type LdsEnv struct {
@@ -48,11 +46,11 @@ func getDefaultProxy() model.Proxy {
 	}
 }
 
+func setNilSidecarOnProxy(proxy *model.Proxy, pushContext *model.PushContext) {
+	proxy.SidecarScope = model.DefaultSidecarScopeForNamespace(pushContext, "not-default")
+}
+
 func TestListenerBuilder(t *testing.T) {
-
-	tnow = time.Now()
-	proxy := getDefaultProxy()
-
 	// prepare
 	t.Helper()
 	ldsEnv := getDefaultLdsEnv()
@@ -60,6 +58,7 @@ func TestListenerBuilder(t *testing.T) {
 	services := []*model.Service{service}
 
 	env := buildListenerEnv(services)
+
 	if err := env.PushContext.InitContext(&env); err != nil {
 		t.Fatalf("init push context error: %s", err.Error())
 	}
@@ -70,12 +69,8 @@ func TestListenerBuilder(t *testing.T) {
 			Endpoint: buildEndpoint(s),
 		}
 	}
-	var sidecarConfig *model.Config
-	if sidecarConfig == nil {
-		proxy.SidecarScope = model.DefaultSidecarScopeForNamespace(env.PushContext, "not-default")
-	} else {
-		proxy.SidecarScope = model.ConvertToSidecarScope(env.PushContext, sidecarConfig, sidecarConfig.Namespace)
-	}
+	proxy := getDefaultProxy()
+	setNilSidecarOnProxy(&proxy, env.PushContext)
 
 	builder := NewListenerBuilder(&proxy)
 	listeners := builder.buildSidecarInboundListeners(ldsEnv.configgen, &env, &proxy, env.PushContext, instances).
@@ -100,8 +95,6 @@ func TestListenerBuilder(t *testing.T) {
 }
 
 func TestVirtualListenerBuilder(t *testing.T) {
-	proxy := getDefaultProxy()
-
 	// prepare
 	t.Helper()
 	ldsEnv := getDefaultLdsEnv()
@@ -119,12 +112,8 @@ func TestVirtualListenerBuilder(t *testing.T) {
 			Endpoint: buildEndpoint(s),
 		}
 	}
-	var sidecarConfig *model.Config
-	if sidecarConfig == nil {
-		proxy.SidecarScope = model.DefaultSidecarScopeForNamespace(env.PushContext, "not-default")
-	} else {
-		proxy.SidecarScope = model.ConvertToSidecarScope(env.PushContext, sidecarConfig, sidecarConfig.Namespace)
-	}
+	proxy := getDefaultProxy()
+	setNilSidecarOnProxy(&proxy, env.PushContext)
 
 	builder := NewListenerBuilder(&proxy)
 	listeners := builder.buildSidecarInboundListeners(ldsEnv.configgen, &env, &proxy, env.PushContext, instances).
@@ -153,8 +142,6 @@ func setInboundCaptureAllOnThisNode(proxy *model.Proxy) {
 }
 
 func TestVirtualInboundListenerBuilder(t *testing.T) {
-	proxy := getDefaultProxy()
-	setInboundCaptureAllOnThisNode(&proxy)
 
 	// prepare
 	t.Helper()
@@ -173,12 +160,10 @@ func TestVirtualInboundListenerBuilder(t *testing.T) {
 			Endpoint: buildEndpoint(s),
 		}
 	}
-	var sidecarConfig *model.Config
-	if sidecarConfig == nil {
-		proxy.SidecarScope = model.DefaultSidecarScopeForNamespace(env.PushContext, "not-default")
-	} else {
-		proxy.SidecarScope = model.ConvertToSidecarScope(env.PushContext, sidecarConfig, sidecarConfig.Namespace)
-	}
+
+	proxy := getDefaultProxy()
+	setInboundCaptureAllOnThisNode(&proxy)
+	setNilSidecarOnProxy(&proxy, env.PushContext)
 
 	builder := NewListenerBuilder(&proxy)
 	listeners := builder.buildSidecarInboundListeners(ldsEnv.configgen, &env, &proxy, env.PushContext, instances).
