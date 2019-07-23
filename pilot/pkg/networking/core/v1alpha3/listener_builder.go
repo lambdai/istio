@@ -90,10 +90,15 @@ func (builder *ListenerBuilder) aggregateVirtualInboundListener(env *model.Envir
 		},
 	}
 
-	for _, c := range filterChains {
-		builder.virtualInboundListener.FilterChains =
-			append(builder.virtualInboundListener.FilterChains, *c)
-	}
+       log.Warnf("inbound listener has tcp proxy filter matching all, %v", builder.virtualInboundListener.FilterChains[0])
+
+       for i, c := range filterChains {
+               builder.virtualInboundListener.FilterChains =
+                       append(builder.virtualInboundListener.FilterChains, *c)
+               log.Warnf("inbound listener add a filter chain %d", i)
+       }
+       log.Warnf("inbound listener has %d filter chains", len(builder.virtualInboundListener.FilterChains))
+
 	if needTLS {
 		builder.virtualInboundListener.ListenerFilters =
 			append(builder.virtualInboundListener.ListenerFilters, listener.ListenerFilter{
