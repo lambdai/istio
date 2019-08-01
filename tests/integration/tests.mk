@@ -49,11 +49,13 @@ endif
 # Generate integration test targets for kubernetes environment.
 test.integration.%.kube: | $(JUNIT_REPORT)
 	mkdir -p $(dir $(JUNIT_UNIT_TEST_XML))
-	$(GO) test -p 1 ${T} ./tests/integration/$(subst .,/,$*)/... ${_INTEGRATION_TEST_WORKDIR_FLAG} ${_INTEGRATION_TEST_CIMODE_FLAG} -timeout 30m \
-	--istio.test.env kube \
-	--istio.test.kube.config ${INTEGRATION_TEST_KUBECONFIG} \
-	--istio.test.hub=${HUB} \
-	--istio.test.tag=${TAG} \
+	$(GO) test -p 1 ${T} ./tests/integration/$(subst .,/,$*)/... -run TestReachability ${_INTEGRATION_TEST_WORKDIR_FLAG} ${_INTEGRATION_TEST_CIMODE_FLAG} -timeout 30m \
+        --log_output_level=tf:debug \
+        --istio.test.env kube \
+        --istio.test.kube.config ${INTEGRATION_TEST_KUBECONFIG} \
+        --istio.test.hub=${HUB} \
+        --istio.test.tag=${TAG} \
+        --istio.test.nocleanup \
 	--istio.test.pullpolicy=${_INTEGRATION_TEST_PULL_POLICY} \
 	${_INTEGRATION_TEST_INGRESS_FLAG} \
 	2>&1 | tee >($(JUNIT_REPORT) > $(JUNIT_UNIT_TEST_XML))
