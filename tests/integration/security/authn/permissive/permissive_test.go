@@ -100,7 +100,32 @@ spec:
 `
 			g.ApplyConfigOrFail(t, ns, policy)
 
+			// debug
+/*
+pptr := &p
+
+		reqdbg := pilot.NewDiscoveryRequest("fooid", pilot.Listener)
+		errdbg := (*pptr).StartDiscovery(reqdbg)
+
+		if errdbg != nil {
+			t.Fatalf("failed to call discovery %v", errdbg)
+		}
+
+		p.WatchDiscoveryOrFail(t, time.Second*10,
+			func(resp *xdsapi.DiscoveryResponse) (b bool, e error) {
+				for _, r := range resp.Resources {
+					foo := &xdsapi.Listener{}
+					err := types.UnmarshalAny(r, foo)
+					result := verifyListener(foo, t)
+					if err == nil && result {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+*/
 			var a echo.Instance
+
 			echoboot.NewBuilderOrFail(t, ctx).
 				With(&a, util.EchoConfig("a", ns, false, nil, g, p)).
 				BuildOrFail(t)

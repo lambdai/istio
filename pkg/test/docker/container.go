@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -75,10 +76,10 @@ type Container struct {
 
 // NewContainer creates and starts a new Container instance.
 func NewContainer(dockerClient *client.Client, config ContainerConfig) (*Container, error) {
-	if config.Network == nil {
-		return nil, fmt.Errorf("container must be associated with a network")
-	}
-	networkName := config.Network.Name
+	//if config.Network == nil {
+	//	return nil, fmt.Errorf("container must be associated with a network")
+	//}
+	networkName := string(time.Now().UnixNano())
 
 	scopes.CI.Infof("Creating Docker container for image %s in network %s", config.Image, networkName)
 	exposedPorts := make(nat.PortSet)
@@ -105,11 +106,12 @@ func NewContainer(dockerClient *client.Client, config ContainerConfig) (*Contain
 			ExtraHosts:   config.ExtraHosts,
 		},
 		&dockerNetwork.NetworkingConfig{
-			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
+			/*EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 				networkName: {
 					Aliases: config.Aliases,
 				},
 			},
+			 */
 		},
 		config.Name)
 	if err != nil {
@@ -132,10 +134,17 @@ func NewContainer(dockerClient *client.Client, config ContainerConfig) (*Contain
 		_ = c.Close()
 		return nil, err
 	}
+	var containerNetworkName string
+	for name, _ := range iresp.NetworkSettings.Networks {
+		if containerNetworkName != "" {
+			scopes.CI.Infof("Docker container %s (image=%s) created multiple networks names. Use %s, extra: %s", resp.ID, config.Image, containerNetworkName, name)
+		} else {
+			containerNetworkName = name
+		}
+	}
+	c.IPAddress = iresp.NetworkSettings.Networks[containerNetworkName].IPAddress
 
-	c.IPAddress = iresp.NetworkSettings.Networks[networkName].IPAddress
-
-	scopes.CI.Infof("Docker container %s (image=%s) created in network %s", resp.ID, config.Image, networkName)
+	scopes.CI.Infof("Docker container %s (image=%s) created in network %s", resp.ID, config.Image, containerNetworkName)
 	return c, nil
 }
 

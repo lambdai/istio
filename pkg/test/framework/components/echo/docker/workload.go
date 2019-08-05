@@ -70,7 +70,7 @@ func newWorkload(e *native.Environment, cfg echo.Config, dumpDir string) (out *w
 		return nil, err
 	}
 
-	network, err := e.Network()
+	//network, err := e.Network()
 	if err != nil {
 		return nil, err
 	}
@@ -182,8 +182,8 @@ func newWorkload(e *native.Environment, cfg echo.Config, dumpDir string) (out *w
 
 	containerCfg := docker.ContainerConfig{
 		Name:       containerName,
-		Network:    network,
-		Labels:     network.Labels, // Use the same labels as the network.
+		//Network:    network,
+		//Labels:     network.Labels, // Use the same labels as the network.
 		Hostname:   hostName,
 		Image:      image,
 		CapAdd:     capabilities,
