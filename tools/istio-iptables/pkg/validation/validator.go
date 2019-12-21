@@ -54,7 +54,7 @@ func (validator *Validator) Run() error {
 		validator.Config,
 	}
 	sError := make(chan error, 1)
-	sTimer := time.NewTimer(300 * time.Second)
+	sTimer := time.NewTimer(3 * time.Second)
 	defer sTimer.Stop()
 	go func() {
 		sError <- s.Run()
@@ -88,11 +88,7 @@ func (validator *Validator) Run() error {
 func genListenerAddress(ip net.IP, ports []string) []string {
 	addresses := make([]string, 0, len(ports))
 	for _, port := range ports {
-		if ip.To4() != nil {
-			addresses = append(addresses, fmt.Sprintf("%s:%s", ip.String(), port))
-		} else {
-			addresses = append(addresses, fmt.Sprintf("[%s]:%s", ip.String(), port))
-		}
+		addresses = append(addresses, net.JoinHostPort(ip.String(), port))
 	}
 	return addresses
 }
@@ -158,7 +154,6 @@ func restoreOriginalAddress(l net.Listener, config *Config, c chan<- ReturnCode)
 func (s *Service) Run() error {
 	// at most 2 message: ipv4 and ipv6
 	c := make(chan ReturnCode, 2)
-	//listeners := make([]net.Listener, len(s.Config.ServerListenAddress))
 	hasAtLeastOneListener := false
 	for _, addr := range s.Config.ServerListenAddress {
 		l, err := net.Listen("tcp", addr)
@@ -168,26 +163,33 @@ func (s *Service) Run() error {
 			continue
 		}
 
-			hasAtLeastOneListener = true
-			go restoreOriginalAddress(l, s.Config, c)
+		hasAtLeastOneListener = true
+		go restoreOriginalAddress(l, s.Config, c)
 
 	}
 	if hasAtLeastOneListener {
 		// bump at least one since we currently support either v4 or v6
 		<-c
 		return nil
-	} else {
-		return fmt.Errorf("no listener available: %s", strings.Join(s.Config.ServerListenAddress, ","))
 	}
+
+	return fmt.Errorf("no listener available: %s", strings.Join(s.Config.ServerListenAddress, ","))
+
 }
 
 func (c *Client) Run() error {
 	laddr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	serverOriginalAddress := fmt.Sprintf("%s:%d", c.Config.ServerOriginalIP, c.Config.ServerOriginalPort)
-	if c.Config.ServerOriginalIP.To4() == nil {
-		laddr, err = net.ResolveTCPAddr("tcp", "[::1]:0")
-		serverOriginalAddress = fmt.Sprintf("[%s]:%d", c.Config.ServerOriginalIP, c.Config.ServerOriginalPort)
+	if err != nil {
+		return err
 	}
+	if c.Config.ServerOriginalIP.To4() == nil {
+		// failure is not expected
+		laddr, err = net.ResolveTCPAddr("tcp", "[::1]:0")
+		if err != nil {
+			return err
+		}
+	}
+	serverOriginalAddress := net.JoinHostPort(c.Config.ServerOriginalIP.String(), strconv.Itoa(int(c.Config.ServerOriginalPort)))
 	raddr, err := net.ResolveTCPAddr("tcp", serverOriginalAddress)
 	if err != nil {
 		return err

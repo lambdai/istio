@@ -33,7 +33,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:  "istio-iptables",
 	Long: "Script responsible for setting up port forwarding for Istio sidecar.",
-	Run: func(cmd *cobra.Command, args []string)  {
+	Run: func(cmd *cobra.Command, args []string) {
 		config := constructConfig()
 		iptConfigurator := NewIptablesConfigurator(config)
 		if !config.SkipRuleApply {
