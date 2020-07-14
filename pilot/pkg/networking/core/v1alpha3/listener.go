@@ -99,8 +99,15 @@ const (
 	// VirtualInboundListenerName is the name for traffic capture listener
 	VirtualInboundListenerName = "virtualInbound"
 
+	// TunnelInboundListenerName is the name for tunnel inbound listener which occupies a standalone port and expect direct connection from peer istio sidecar.
+	TunnelInboundListenerName = "tunnelInbound"
+
 	// virtualInboundCatchAllHTTPFilterChainName is the name of the catch all http filter chain
 	virtualInboundCatchAllHTTPFilterChainName = "virtualInbound-catchall-http"
+
+	// tunnelInboundHTTPFilterChainName is the name of the only http2 filter chain. It accepts both H2 plain requests and H2 connect.
+	// TODO(lambdai): h2 connect is not handled correctly yet.
+	tunnelInboundHTTPFilterChainName = "tunnelInbound-http2"
 
 	// dnsListenerName is the name for the DNS resolver listener
 	dnsListenerName = "dns"
@@ -141,6 +148,9 @@ const (
 	// ProxyInboundListenPort is the port on which all inbound traffic to the pod/vm will be captured to
 	// TODO: allow configuration through mesh config
 	ProxyInboundListenPort = 15006
+
+	// TunnelInboundListenPort is the port on which all traffic from istio peer sidecar directly send to.
+	TunnelInboundListenPort = 15008
 
 	// Used in xds config. Metavalue bind to this key is used by pilot as xds server but not by envoy.
 	// So the meta data can be erased when pushing to envoy.

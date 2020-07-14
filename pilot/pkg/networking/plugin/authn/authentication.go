@@ -23,6 +23,7 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking"
 	"istio.io/istio/pilot/pkg/networking/plugin"
+	"istio.io/istio/pilot/pkg/security/authn"
 	"istio.io/istio/pilot/pkg/security/authn/factory"
 	"istio.io/istio/pkg/config/labels"
 )
@@ -37,9 +38,13 @@ func NewPlugin() plugin.Plugin {
 
 // OnInboundFilterChains setups filter chains based on the authentication policy.
 func (Plugin) OnInboundFilterChains(in *plugin.InputParams) []networking.FilterChain {
+	var tlsGetter authn.TlsModeGetter = authn.StrictTlsModeValue{}
+	if in.ServiceInstance != nil {
+		tlsGetter = authn.NewTlsPortNumber(in.ServiceInstance.Endpoint.EndpointPort)
+	}
 	return factory.NewPolicyApplier(in.Push,
 		in.ServiceInstance, in.Node.Metadata.Namespace, labels.Collection{in.Node.Metadata.Labels}).InboundFilterChain(
-		in.ServiceInstance.Endpoint.EndpointPort, in.Push.Mesh.SdsUdsPath, in.Node, in.ListenerProtocol)
+		tlsGetter, in.Push.Mesh.SdsUdsPath, in.Node, in.ListenerProtocol)
 }
 
 // OnOutboundListener is called whenever a new outbound listener is added to the LDS output for a given service

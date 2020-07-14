@@ -66,6 +66,8 @@ type ListenerBuilder struct {
 	virtualInboundListener  *listener.Listener
 	// UDP listener for local dns resolution in Envoy
 	dnsListener *listener.Listener
+	// Tunnel inbound listener multiplex listener and redirect the traffic to other listeners.
+	tunnelInboundListener *listener.Listener
 }
 
 // Setup the filter chain match so that the match should work under both
@@ -268,6 +270,70 @@ func (lb *ListenerBuilder) buildVirtualInboundListener(configgen *ConfigGenerato
 	}
 	lb.aggregateVirtualInboundListener(needTLSForPassThroughFilterChain)
 
+	return lb
+}
+
+func (lb *ListenerBuilder) buildTunnelInboundListener(configgen *ConfigGeneratorImpl) *ListenerBuilder {
+	actualWildcard, _ := getActualWildcardAndLocalHost(lb.node)
+	// TODO(lambdai):
+	// Merge ipv4 and ipv6
+	// Set up other filters
+	//filterChains := buildInboundCatchAllHTTPFilterChains(configgen, lb.node, lb.push)
+	allChains := make([]istionetworking.FilterChain, 0)
+
+	pluginParams := &plugin.InputParams{
+		ListenerProtocol: istionetworking.ListenerProtocolHTTP,
+		ListenerCategory: networking.EnvoyFilter_SIDECAR_INBOUND,
+		Node:             lb.node,
+		ServiceInstance:  nil,
+		//Port:             instance.ServicePort,
+		Push: lb.push,
+	}
+
+	for _, p := range configgen.Plugins {
+		chains := p.OnInboundFilterChains(pluginParams)
+		allChains = append(allChains, chains...)
+	}
+
+	filterChains := make([]*listener.FilterChain, 0, 2)
+	for _, chain := range allChains {
+		httpOpts := configgen.buildSidecarInboundHTTPListenerOptsForPortOrUDS(node, in)
+		httpOpts.statPrefix = clusterName
+		connectionManager := buildHTTPConnectionManager(in, httpOpts, chain.HTTP)
+
+		filter := &listener.Filter{
+			Name:       wellknown.HTTPConnectionManager,
+			ConfigType: &listener.Filter_TypedConfig{TypedConfig: util.MessageToAny(connectionManager)},
+		}
+
+		filterChain := &listener.FilterChain{
+			FilterChainMatch: chain.FilterChainMatch,
+			Filters:          []*listener.Filter{filter},
+		}
+
+		// MTLS is enforced on tunnel listener
+		filterChain.FilterChainMatch.TransportProtocol = "tls"
+		filterChain.FilterChainMatch.ApplicationProtocols =
+			append(filterChain.FilterChainMatch.ApplicationProtocols, mtlsHTTPALPNs...)
+
+		// Update transport socket from the TLS context configured by the plugin.
+		filterChain.TransportSocket = &core.TransportSocket{
+			Name:       util.EnvoyTLSSocketName,
+			ConfigType: &core.TransportSocket_TypedConfig{TypedConfig: util.MessageToAny(chain.TLSContext)},
+		}
+
+		filterChain.Name = tunnelInboundHTTPFilterChainName
+		filterChains = append(filterChains, filterChain)
+	}
+
+	lb.tunnelInboundListener = &listener.Listener{
+		Name:                                TunnelInboundListenerName,
+		Address:                             util.BuildAddress(actualWildcard, TunnelInboundListenPort),
+		Transparent:                         proto.BoolFalse,
+		HiddenEnvoyDeprecatedUseOriginalDst: proto.BoolTrue,
+		TrafficDirection:                    core.TrafficDirection_INBOUND,
+		FilterChains:                        filterChains,
+	}
 	return lb
 }
 
