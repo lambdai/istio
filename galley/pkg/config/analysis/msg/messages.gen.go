@@ -156,6 +156,9 @@ var (
 	// IngressRouteRulesNotAffected defines a diag.MessageType for message "IngressRouteRulesNotAffected".
 	// Description: Route rules have no effect on ingress gateway requests
 	IngressRouteRulesNotAffected = diag.NewMessageType(diag.Warning, "IST0140", "Subset in virtual service %s has no effect on ingress gateway %s requests")
+
+	// Description: The hosts under mtls should not be set to open access.
+	HostsUnderBothMtlsAndOpenGateway = diag.NewMessageType(diag.Warning, "IST0141", "Virtual service %s defined hosts %s are both open to gateway and mtls access in gateway %s")
 )
 
 // All returns a list of all known message types.
@@ -257,6 +260,17 @@ func NewGatewayPortNotOnWorkload(r *resource.Instance, selector string, port int
 	)
 }
 
+// TODO(lambdai)
+// NewVirtualServiceMtlsAccessNonMtls returns a new diag.Message based on HostsUnderBothMtlsAndOpenGateway.
+func NewVirtualServiceMtlsAccessNonMtls(r *resource.Instance, virtualservices string, mtlsgateway string) diag.Message {
+	return diag.NewMessage(
+		HostsUnderBothMtlsAndOpenGateway,
+		r,
+		virtualservices,
+		mtlsgateway,
+	)
+}
+
 // NewIstioProxyImageMismatch returns a new diag.Message based on IstioProxyImageMismatch.
 func NewIstioProxyImageMismatch(r *resource.Instance, proxyImage string, injectionImage string) diag.Message {
 	return diag.NewMessage(
@@ -298,7 +312,7 @@ func NewUnknownAnnotation(r *resource.Instance, annotation string) diag.Message 
 // NewConflictingMeshGatewayVirtualServiceHosts returns a new diag.Message based on ConflictingMeshGatewayVirtualServiceHosts.
 func NewConflictingMeshGatewayVirtualServiceHosts(r *resource.Instance, virtualServices string, host string) diag.Message {
 	return diag.NewMessage(
-		ConflictingMeshGatewayVirtualServiceHosts,
+		HostsUnderBothMtlsAndOpenGateway,
 		r,
 		virtualServices,
 		host,
