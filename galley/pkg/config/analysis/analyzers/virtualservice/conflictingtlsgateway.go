@@ -29,7 +29,7 @@ import (
 // ConflictingTlsGatewayHostsAnalyzer checks if Mtls virtual services can be accessed by non-mtls method.
 type ConflictingTlsGatewayHostsAnalyzer struct{}
 
-var _ analysis.Analyzer = &ConflictingMeshGatewayHostsAnalyzer{}
+var _ analysis.Analyzer = &ConflictingTlsGatewayHostsAnalyzer{}
 
 // Metadata implements Analyzer
 func (c *ConflictingTlsGatewayHostsAnalyzer) Metadata() analysis.Metadata {

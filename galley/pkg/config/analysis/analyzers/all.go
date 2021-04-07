@@ -54,6 +54,7 @@ func All() []analysis.Analyzer {
 		&virtualservice.DestinationRuleAnalyzer{},
 		&virtualservice.GatewayAnalyzer{},
 		&virtualservice.RegexAnalyzer{},
+		&virtualservice.ConflictingTlsGatewayHostsAnalyzer{},
 		&destinationrule.CaCertificateAnalyzer{},
 		&serviceentry.ProtocolAdressesAnalyzer{},
 		&webhook.Analyzer{},
